@@ -236,7 +236,7 @@ function updateStoreState(){
    Al quedar escrita aquí, TODAS las máquinas que abran este archivo se conectan
    solas a Google Sheets: el usuario final no configura nada.
    Si se deja vacío (''), el sistema funciona en modo local de demostración. */
-const BACKEND_URL_FIJA='https://script.google.com/macros/s/AKfycbyBMyhZFLZB1wQ9v0KmQtmPSfbQURBNNO3mVnalZbPymdwLYUSh9pl93pfglSh793ce/exec';
+const BACKEND_URL_FIJA='';
 
 const API={url:'',token:'',role:'',mecId:''};
 function isBackend(){return !!API.url;}
@@ -885,11 +885,28 @@ function openPmrForm(id){
       <div class="field"><label>Hrs. estimadas</label><input type="number" step="0.5" id="p_hrs" value="${p.hrsEst||1}"></div>
       <div class="field"><label>¿Con proveedor?</label><select id="p_prov"><option value="0" ${!p.proveedor?'selected':''}>No</option><option value="1" ${p.proveedor?'selected':''}>Sí</option></select></div>
     </div>
-    <div class="field" style="margin-top:13px"><label>Repuestos / materiales</label><input id="p_rep" value="${esc(p.repuestos||'')}" placeholder="Ej. Grasa NLGI 2, sello mecánico…"></div>`,
+    <div class="field" style="margin-top:13px"><label>Repuestos / materiales</label><input id="p_rep" value="${esc(p.repuestos||'')}" placeholder="Ej. Grasa NLGI 2, sello mecánico…"></div>
+    <div class="sectlabel">Insumos requeridos</div>
+    <div id="p_insumos">${matRows('insumos',p.insumos)}</div>
+    <button class="btn sm ghost" type="button" onclick="addMatRow('insumos')">+ Agregar insumo</button>
+    <div class="sectlabel">Herramientas necesarias</div>
+    <div id="p_herramientas">${matRows('herramientas',p.herramientas)}</div>
+    <button class="btn sm ghost" type="button" onclick="addMatRow('herramientas')">+ Agregar herramienta</button>
+    <div class="sectlabel">Condiciones de la rutina</div>
+    <div class="field"><textarea id="p_cond" placeholder="Ej. La planta debe estar parada, equipo desenergizado y bloqueado (LOTO)…">${esc(p.condiciones||'')}</textarea></div>`,
     [id?{t:'Eliminar',cls:'danger',fn:`delPmr('${id}')`}:null,{t:'Cancelar',cls:'ghost',fn:'closeModal()'},
      {t:id?'Guardar':'Crear rutina',cls:'primary',fn:`savePmr('${id||''}')`}].filter(Boolean));
   setTimeout(()=>{pmrTipoChange();pmrFreqChange();},20);
 }
+function matRow(kind,r){r=r||{};return `<div style="display:grid;grid-template-columns:110px 1fr 80px auto;gap:8px;margin-bottom:8px" data-mat="${kind}">
+  <input data-mcod placeholder="Código" value="${esc(r.cod||'')}" style="font-family:var(--mono);text-transform:uppercase">
+  <input data-mdesc placeholder="Descripción" value="${esc(r.desc||'')}">
+  <input data-mcant type="number" min="1" placeholder="Cant." value="${r.cant||''}">
+  <button class="btn sm ghost" type="button" onclick="this.closest('[data-mat]').remove()">✕</button></div>`;}
+function matRows(kind,list){return (list&&list.length?list:[{}]).map(r=>matRow(kind,r)).join('');}
+function addMatRow(kind){const d=document.createElement('div');d.innerHTML=matRow(kind,{});$('#p_'+kind).appendChild(d.firstElementChild);}
+function readMats(kind){return $$('#p_'+kind+' [data-mat]').map(r=>({cod:r.querySelector('[data-mcod]').value.trim().toUpperCase(),
+  desc:r.querySelector('[data-mdesc]').value.trim(),cant:Math.max(1,+r.querySelector('[data-mcant]').value||1)})).filter(r=>r.cod||r.desc);}
 function pmrTipoChange(){const cal=$('#p_tipo').value==='Calendario';
   ['p_calWrap','p_calProx'].forEach(i=>$('#'+i).style.display=cal?'':'none');
   ['p_horWrap','p_horAcum'].forEach(i=>$('#'+i).style.display=cal?'none':'');}
@@ -910,7 +927,8 @@ async function savePmr(id){
   const data={activo:$('#p_activo').value,componente:$('#p_comp').value.trim(),tarea:$('#p_tarea').value.trim(),tipo,
     freqDias:+$('#p_freqDias').value,prox:$('#p_prox').value,freqHoras:+$('#p_freqHoras').value,horasAcum:+$('#p_horasAcum').value,
     diaSemana:$('#p_dow').value,
-    mecSug:$('#p_mec').value,hrsEst:+$('#p_hrs').value,proveedor:$('#p_prov').value==='1',repuestos:$('#p_rep').value.trim()};
+    mecSug:$('#p_mec').value,hrsEst:+$('#p_hrs').value,proveedor:$('#p_prov').value==='1',repuestos:$('#p_rep').value.trim(),
+    insumos:readMats('insumos'),herramientas:readMats('herramientas'),condiciones:$('#p_cond').value.trim()};
   if(id){Object.assign(pmr(id),data);}else{data.id=uid('p_');data.otActiva='';data.ultimo='';DB.pmrs.push(data);}
   await save();closeModal();render();toast('Rutina preventiva guardada');
 }
@@ -1105,7 +1123,7 @@ function openMecForm(id){
       <div class="field"><label>Nombre</label><input id="m_nombre" value="${esc(m.nombre)}" placeholder="Nombre completo"></div>
       <div class="field"><label>Rol / puesto</label><select id="m_rol">${roles.map(r=>`<option ${m.rol===r?'selected':''}>${esc(r)}</option>`).join('')}</select></div></div>
     <div class="fgrid fg2" style="margin-top:12px">
-      <div class="field"><label>Especialidad</label><select id="m_esp">${TIPOS.map(t=>`<option ${m.especialidad===t?'selected':''}>${t}</option>`).join('')}</select></div>
+      <div class="field"><label>Especialidad</label><select id="m_esp">${[...TIPOS,'Supervisor'].map(t=>`<option ${m.especialidad===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div class="field"><label>PIN de acceso (opcional)</label><input id="m_pin" value="${esc(m.pin||'')}" placeholder="Ej. 1234" maxlength="8"><div class="hint">Si lo dejas vacío, entra solo seleccionando su nombre.</div></div></div>
     <div class="field" style="margin-top:12px"><label>Color de identificación</label>
       <div style="display:flex;gap:8px;margin-top:4px">${colors.map(c=>`<button type="button" onclick="this.parentNode.querySelectorAll('button').forEach(b=>b.style.outline='');this.style.outline='2px solid #fff';document.getElementById('m_color').value='${c}'" style="width:30px;height:30px;border-radius:8px;border:1px solid var(--line);background:${c};cursor:pointer;${m.color===c?'outline:2px solid #fff':''}"></button>`).join('')}</div>
