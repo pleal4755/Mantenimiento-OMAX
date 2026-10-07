@@ -1095,13 +1095,15 @@ function mecTasksAdmin(id){
       :'<div class="empty-lg"><div class="ei">✅</div><h4>Sin tareas asignadas</h4></div>'}`,
     [{t:'Cerrar',cls:'ghost',fn:'closeModal()'}]);
 }
+const ROLES_MEC=['Mecánico','Electricista','Soldador','Multi-oficio','Supervisor'];
 function openMecForm(id){
   const m=id?DB.mecanicos.find(x=>x.id===id):{nombre:'',rol:'Mecánico',especialidad:'Mecánico',color:'#2f7fd1',pin:''};
   const colors=['#2f7fd1','#f2b528','#34c98a','#9b7fe0','#f08a3c','#ef5b5b'];
+  const roles=ROLES_MEC.includes(m.rol)||!m.rol?ROLES_MEC:[...ROLES_MEC,m.rol];
   setModal(id?'Editar mecánico':'Nuevo mecánico',`
     <div class="fgrid fg2">
       <div class="field"><label>Nombre</label><input id="m_nombre" value="${esc(m.nombre)}" placeholder="Nombre completo"></div>
-      <div class="field"><label>Rol / puesto</label><input id="m_rol" value="${esc(m.rol)}" placeholder="Mecánico, Electricista…"></div></div>
+      <div class="field"><label>Rol / puesto</label><select id="m_rol">${roles.map(r=>`<option ${m.rol===r?'selected':''}>${esc(r)}</option>`).join('')}</select></div></div>
     <div class="fgrid fg2" style="margin-top:12px">
       <div class="field"><label>Especialidad</label><select id="m_esp">${TIPOS.map(t=>`<option ${m.especialidad===t?'selected':''}>${t}</option>`).join('')}</select></div>
       <div class="field"><label>PIN de acceso (opcional)</label><input id="m_pin" value="${esc(m.pin||'')}" placeholder="Ej. 1234" maxlength="8"><div class="hint">Si lo dejas vacío, entra solo seleccionando su nombre.</div></div></div>
