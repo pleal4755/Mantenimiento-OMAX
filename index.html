@@ -236,7 +236,7 @@ function updateStoreState(){
    Al quedar escrita aquí, TODAS las máquinas que abran este archivo se conectan
    solas a Google Sheets: el usuario final no configura nada.
    Si se deja vacío (''), el sistema funciona en modo local de demostración. */
-const BACKEND_URL_FIJA='https://script.google.com/macros/s/AKfycbyBMyhZFLZB1wQ9v0KmQtmPSfbQURBNNO3mVnalZbPymdwLYUSh9pl93pfglSh793ce/exec';
+const BACKEND_URL_FIJA='';
 
 const API={url:'',token:'',role:'',mecId:''};
 function isBackend(){return !!API.url;}
@@ -853,6 +853,7 @@ function pmrActOptions(ut,selId){
 function pmrUtChange(){$('#p_activo').innerHTML=pmrActOptions($('#p_ut').value,'');}
 function openPmrForm(id){
   const p=id?pmr(id):{activo:DB.activos[0]?.id||'',componente:'',tarea:'',tipo:'Calendario',freqDias:30,freqHoras:500,prox:today(),horasAcum:0,mecSug:'',hrsEst:1,repuestos:'',proveedor:false,diaSemana:''};
+  const insumosIni=p.insumos&&p.insumos.length?p.insumos:(p.repuestos||'').split(/[,;\n]+/).map(s=>s.trim()).filter(Boolean).map(s=>({cod:'',desc:s,cant:1}));
   const selUt=p.activo?(activo(p.activo)?.ut||''):'';
   const utList=[...new Set(DB.activos.map(a=>a.ut).filter(Boolean))].sort();
   const utOpts=`<option value="">— Todas —</option>`+utList.map(u=>`<option value="${esc(u)}" ${u===selUt?'selected':''}>${esc(u)}</option>`).join('');
@@ -885,9 +886,8 @@ function openPmrForm(id){
       <div class="field"><label>Hrs. estimadas</label><input type="number" step="0.5" id="p_hrs" value="${p.hrsEst||1}"></div>
       <div class="field"><label>¿Con proveedor?</label><select id="p_prov"><option value="0" ${!p.proveedor?'selected':''}>No</option><option value="1" ${p.proveedor?'selected':''}>Sí</option></select></div>
     </div>
-    <div class="field" style="margin-top:13px"><label>Repuestos / materiales</label><input id="p_rep" value="${esc(p.repuestos||'')}" placeholder="Ej. Grasa NLGI 2, sello mecánico…"></div>
     <div class="sectlabel">Insumos requeridos</div>
-    <div id="p_insumos">${matRows('insumos',p.insumos)}</div>
+    <div id="p_insumos">${matRows('insumos',insumosIni)}</div>
     <button class="btn sm ghost" type="button" onclick="addMatRow('insumos')">+ Agregar insumo</button>
     <div class="sectlabel">Herramientas necesarias</div>
     <div id="p_herramientas">${matRows('herramientas',p.herramientas)}</div>
@@ -927,7 +927,7 @@ async function savePmr(id){
   const data={activo:$('#p_activo').value,componente:$('#p_comp').value.trim(),tarea:$('#p_tarea').value.trim(),tipo,
     freqDias:+$('#p_freqDias').value,prox:$('#p_prox').value,freqHoras:+$('#p_freqHoras').value,horasAcum:+$('#p_horasAcum').value,
     diaSemana:$('#p_dow').value,
-    mecSug:$('#p_mec').value,hrsEst:+$('#p_hrs').value,proveedor:$('#p_prov').value==='1',repuestos:$('#p_rep').value.trim(),
+    mecSug:$('#p_mec').value,hrsEst:+$('#p_hrs').value,proveedor:$('#p_prov').value==='1',repuestos:'',
     insumos:readMats('insumos'),herramientas:readMats('herramientas'),condiciones:$('#p_cond').value.trim()};
   if(id){Object.assign(pmr(id),data);}else{data.id=uid('p_');data.otActiva='';data.ultimo='';DB.pmrs.push(data);}
   await save();closeModal();render();toast('Rutina preventiva guardada');
@@ -940,7 +940,7 @@ async function genOtFromPmr(id){
   if(p.otActiva&&DB.ots.find(o=>o.id===p.otActiva&&o.status!=='Terminada'&&o.status!=='Cancelada')){toast('Ya tiene una OT activa');return;}
   const ot={id:uid('o_'),num:nextOtNum(),activo:p.activo,equipoTxt:'',clase:'Preventivo (PMR)',prioridad:4,fechaProg:p.tipo==='Calendario'?p.prox:today(),
     planificada:true,solRef:'',desc:p.componente+' — '+p.tarea,mecanico:p.mecSug||'',status:p.mecSug?'Asignada':'Pendiente',
-    tareas:[{t:p.tarea,done:false},{t:'Verificar repuestos: '+(p.repuestos||'N/A'),done:false}],hrsEst:p.hrsEst||1,hrsReal:0,tiempoMuerto:0,
+    tareas:[{t:p.tarea,done:false},{t:'Verificar insumos: '+((p.insumos&&p.insumos.length)?p.insumos.map(i=>i.cant+' × '+(i.desc||i.cod)+(i.cod&&i.desc?' ('+i.cod+')':'')).join(', '):(p.repuestos||'N/A')),done:false}],hrsEst:p.hrsEst||1,hrsReal:0,tiempoMuerto:0,
     seguridad:true,costoMO:0,costoRep:0,costoMisc:0,comentarios:p.proveedor?'Atención con proveedor.':'',recibeOk:false,origen:'PMR',pmrId:p.id};
   DB.ots.push(ot);p.otActiva=ot.id;
   await save();render();toast('OT '+ot.num+' generada'+(p.mecSug?' y asignada a '+mecanico(p.mecSug).nombre:''));
